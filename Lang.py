@@ -111,6 +111,48 @@ programa3 = Program([
     )
 ])
 
+programa4 = Program([
+    Assign("x", IntLit(10)),  # x = 10
+    Assign("y", IntLit(0)),   # y = 0
+    While(
+        condition=BinOp(">", Var("x"), IntLit(0)),  # while x > 0
+        body=[
+            Assign("y", BinOp("+", Var("y"), Var("x"))),  # y += x
+            Assign("x", BinOp("-", Var("x"), IntLit(1)))  # x -= 1
+        ]
+    )
+])
+
+programa5 = Program([
+    FunctionDef(
+        name="add",
+        params=["a", "b"],
+        body=[
+            Assign("result", BinOp("+", Var("a"), Var("b"))),  # result = a + b
+            Assign("return", Var("result"))                   # return result
+        ]
+    ),
+    Assign("z", FunctionCall("add", [IntLit(5), IntLit(7)]))  # z = add(5, 7)
+])
+
+programa6 = Program([
+    Seq([
+        Assign("a", IntLit(1)),  # a = 1
+        Assign("b", IntLit(2)),  # b = 2
+        Assign("c", BinOp("*", Var("a"), Var("b")))  # c = a * b
+    ])
+])
+
+programa7 = Program([
+    Assign("x", BoolLit(True)),  # x = true
+    Assign("y", BoolLit(False)), # y = false
+    If(
+        condition=BinOp("&&", Var("x"), UnaryOp("not", Var("y"))),  # if x && not y
+        then_branch=[Assign("result", IntLit(1))],  # result = 1
+        else_branch=[Assign("result", IntLit(0))]  # else result = 0
+    )
+])
+
 # 1.3 Pretty Printing
 
 def indent(lines, level=1):
@@ -177,3 +219,7 @@ if __name__ == "__main__":
     print("Programa 1:", programa1)
     print("Programa 2:", programa2)
     print("Programa 3:", programa3)
+    print("Programa 4:", programa4)
+    print("Programa 5:", programa5)
+    print("Programa 6:", programa6)
+    print("Programa 7:", programa7)
