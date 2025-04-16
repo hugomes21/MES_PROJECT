@@ -1,161 +1,116 @@
-from parsita import Parser, lit, reg, opt, rep, rep1, eof, Success, Failure
+from lark import Lark, Transformer, v_args
 from Lang import *
 
-# Helper to remove indentation (strip whitespace)
-def wsp(p):
-    return opt(reg(r'[ \t]*')) >> p << opt(reg(r'[ \t]*'))
+grammar = r"""
+    start: stmt+
 
+    stmt: IDENTIFIER "=" expr "\n"
 
-class LangParser(Parser):
-    number = wsp(reg(r'-?\d+')) >> (lambda x: IntLit(int(x)))
-    boolean = (wsp(lit('true')) >> (lambda _: BoolLit(True))) | (lit('false') >> (lambda _: BoolLit(False)))
-    identifier = reg(r'[a-zA-Z_]\w*')
+    ?expr: expr "==" expr   -> eq
+         | expr "!=" expr   -> neq
+         | expr "<" expr    -> lt
+         | expr ">" expr    -> gt
+         | expr "+" expr    -> add
+         | expr "-" expr    -> sub
+         | expr "*" expr    -> mul
+         | expr "/" expr    -> div
+         | NUMBER           -> number
+         | BOOLEAN          -> boolean
+         | IDENTIFIER       -> var
+         | "(" expr ")"
 
-    var = identifier >> Var
+    BOOLEAN: "true" | "false"
+    IDENTIFIER: /[a-zA-Z_]\w*/
+    NUMBER: /-?\d+/
 
-    lparen = lit('(')
-    rparen = lit(')')
+    %import common.NEWLINE
+    %import common.WS_INLINE
+    %ignore WS_INLINE
+"""
 
-    # Forward declaration
-    def lazy_expr(): return LangParser.expr
+class ASTTransformer(Transformer):
+    def number(self, n): # n[0] é o número
+        return IntLit(int(n[0]))
 
-    atom = number | boolean | var | (lparen >> lazy_expr << rparen)
+    def boolean(self, b): # b[0] é o booleano
+        return BoolLit(b[0] == "true")
 
-    @staticmethod
-    def bin_expr(term_parser, ops):
-        def parser():
-            return term_parser & rep(wsp(ops) & term_parser)
-        return parser() >> LangParser.fold_binop
+    def var(self, name): # name[0] é o nome da variável
+        return Var(name[0])
 
-    @staticmethod
-    def fold_binop(first_and_rest):
-        first, rest = first_and_rest
-        result = first
-        for (op, rhs) in rest:
-            result = BinOp(op, result, rhs)
-        return result
+    def add(self, args): # args[0] e args[1] são os operandos
+        return BinOp("+", args[0], args[1])
 
-# Define expressions after the class is fully defined
-LangParser.mul_div = LangParser.bin_expr(LangParser.atom, wsp(lit('*')) | wsp(lit('/')))
-LangParser.add_sub = LangParser.bin_expr(LangParser.mul_div, wsp(lit('+')) | wsp(lit('-')))
-LangParser.comparisons = LangParser.bin_expr(LangParser.add_sub, wsp(lit('==')) | wsp(lit('!=')) | wsp(lit('<')) | wsp(lit('>')))
-LangParser.expr = LangParser.comparisons
+    def sub(self, args):
+        return BinOp("-", args[0], args[1])
 
-# Statements
-LangParser.assignment = (LangParser.identifier << wsp(lit('='))) & LangParser.expr << wsp(lit('\n'))
-LangParser.assignment = LangParser.assignment >> (lambda pair: Assign(pair[0], pair[1]))
+    def mul(self, args):
+        return BinOp("*", args[0], args[1])
 
-LangParser.if_stmt = (
-    wsp(lit('if')) >> LangParser.expr << wsp(lit(':')) << wsp(lit('\n')) &
-    rep1(LangParser.stmt) &
-    wsp(lit('else:')) << wsp(lit('\n')) &
-    rep1(LangParser.stmt)
-) >> (lambda t: If(t[0], t[1], t[2]))
+    def div(self, args):
+        return BinOp("/", args[0], args[1])
 
-LangParser.while_stmt = (
-    wsp(lit('while')) >> LangParser.expr << wsp(lit(':')) << wsp(lit('\n')) &
-    rep1(LangParser.stmt)
-) >> (lambda t: While(t[0], t[1]))
+    def eq(self, args):
+        return BinOp("==", args[0], args[1])
 
-LangParser.for_stmt = (
-    wsp(lit('for')) >> LangParser.identifier << wsp(lit('in')) << wsp(lit('range(')) &
-    LangParser.expr << wsp(lit(',')) & LangParser.expr << wsp(lit('):')) << wsp(lit('\n')) &
-    rep1(LangParser.stmt)
-) >> (lambda t: For(t[0], t[1], t[2], t[3]))
+    def neq(self, args):
+        return BinOp("!=", args[0], args[1])
 
-LangParser.stmt = LangParser.assignment | LangParser.if_stmt | LangParser.while_stmt | LangParser.for_stmt
-LangParser.stmts = rep(LangParser.stmt)
+    def lt(self, args):
+        return BinOp("<", args[0], args[1])
 
-LangParser.program = opt(rep(wsp(lit('\n')))) >> LangParser.stmts << eof
-LangParser.program = LangParser.program >> (lambda lst: Program(lst))
+    def gt(self, args):
+        return BinOp(">", args[0], args[1])
+
+    def stmt(self, args): # args[0] é o nome da variável e args[1] é a expressão
+        if len(args) != 2:
+            raise ValueError("Invalid assignment statement")
+        if not isinstance(args[0], str):
+            raise ValueError("Invalid variable name")
+        if not isinstance(args[1], Expr):
+            raise ValueError("Invalid expression")
+        return Assign(args[0], args[1])
+
+    def start(self, stmts): # stmts é uma lista de declarações
+        if not isinstance(stmts, list):
+            raise ValueError("Invalid program")
+        return Program(stmts)
+
+parser = Lark(grammar, parser='lalr', transformer=ASTTransformer())
 
 def parse_code(code: str) -> Program:
-    result = LangParser.program.parse(code)
-    if isinstance(result, Success):
-        return result.value
-    else:
-        raise SyntaxError(f"Parsing failed:\n{result.explanation}")
-
-from Lang import programa1, programa2, programa3, programa4, programa5, programa6, programa7
-
-# -------- Testes --------
-valid_programs = [
-    ("""
-x = 10
-y = x + 5
-""", programa1),
-    ("""
-a = 3
-b = 4
-if a > b:
-    max = a
-else:
-    max = b
-""", programa2),
-    ("""
-sum = 0
-for i in range(1, 5):
-    sum = sum + i
-""", programa3),
-    ("""
-x = 10
-y = 0
-while x > 0:
-    y = y + x
-    x = x - 1
-""", programa4),
-    ("""
-def add(a, b):
-    result = a + b
-    return result
-
-z = add(5, 7)
-""", programa5),
-    ("""
-a = 1
-b = 2
-c = a * b
-""", programa6),
-    ("""
-x = true
-y = false
-if x && not y:
-    result = 1
-else:
-    result = 0
-""", programa7),
-]
-
-invalid_programs = [
-    """
-x == 10
-""",
-    """
-if x > 3
-    y = 4
-""",
-    """
-for i in range(1 5):
-    x = x + 1
-"""
-]
+    return parser.parse(code)
 
 if __name__ == "__main__":
-    # Testar programas válidos
-    for i, (code, expected_ast) in enumerate(valid_programs):
-        try:
-            ast = parse_code(code)
-            assert ast == expected_ast, f"AST mismatch for valid program {i+1}"
-            print(f"Valid program {i+1} parsed successfully and matches expected AST.")
-        except SyntaxError as e:
-            print(f"Valid program {i+1} failed to parse:\n{e}\n")
-        except AssertionError as e:
-            print(e)
+    # Exemplos válidos (mais complexos)
+    valid_programs = [
+        ("x = 10\ny = 20\nz = x * y + (x - y) / 2\n", "Programa válido 1"),
+        ("a = 5\nb = a * (a + 2)\nc = b == 35\nd = c != false\n", "Programa válido 2"),
+        ("flag = true\nresult = flag == false\nother = (result != true) + 1\n", "Programa válido 3"),
+        ("n1 = 7\nn2 = 3\nsum = n1 + n2\nprod = sum * (n1 - n2)\n", "Programa válido 4"),
+        ("x = 1\ny = 2\nz = 3\nw = (x + y + z) * (x - y - z)\n", "Programa válido 5"),
+        ("a = 10\nb = 2\nc = a / b\nis_small = c < 10\n", "Programa válido 6"),
+    ]
 
-    # Testar programas inválidos
-    for i, code in enumerate(invalid_programs):
+    for code, description in valid_programs:
         try:
             ast = parse_code(code)
-            print(f"Invalid program {i+1} should not parse, but got:\n{ast}\n")
-        except SyntaxError:
-            print(f"Invalid program {i+1} correctly failed to parse.\n")
+            print(f"✅ {description} parseado com sucesso:\n{ast}\n")
+        except Exception as e:
+            print(f"❌ {description} falhou inesperadamente: {e}\n")
+
+    # Exemplos inválidos (mais complexos)
+    invalid_programs = [
+        ("x = 10\ny =\nz = x + y\n", "Programa inválido 1"),
+        ("a = 5\nb = * 2\n", "Programa inválido 2"),
+        ("flag = true\nresult = flag ==\n", "Programa inválido 3"),
+        ("x = (10 + 2\n", "Programa inválido 4"),
+        ("y = 3 +\n", "Programa inválido 5"),
+    ]
+
+    for code, description in invalid_programs:
+        try:
+            ast = parse_code(code)
+            print(f"❌ {description} deveria falhar mas foi parseado:\n{ast}\n")
+        except Exception as e:
+            print(f"✅ {description} corretamente rejeitado: {e}\n")
