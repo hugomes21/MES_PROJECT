@@ -122,7 +122,7 @@ programa4 = Program([
         ]
     )
 ])
-
+ 
 programa5 = Program([
     FunctionDef(
         name="add",
@@ -208,7 +208,7 @@ def pretty_stmt(stmt: Stmt, level=0) -> List[str]:
 
 def pretty_program(prog: Program) -> str:
     lines = sum([pretty_stmt(s) for s in prog.body], [])
-    return "\n".join(lines)
+    return "\n".join(line.lstrip() for line in lines) + "\n"
 
 # Injetar __str__ no Program
 Program.__str__ = lambda self: pretty_program(self)
