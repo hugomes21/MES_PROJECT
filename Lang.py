@@ -203,6 +203,11 @@ def pretty_stmt(stmt: Stmt, level=0) -> List[str]:
         return [header] + indent(body, level + 1)
     elif isinstance(stmt, Seq):
         return sum([pretty_stmt(s, level) for s in stmt.stmts], [])
+    elif isinstance(stmt , UnaryOp):
+        if stmt.op == "not":
+            return [f"(not {pretty_expr(stmt.expr)})"]
+        else:
+            return [f"{stmt.op} {pretty_expr(stmt.expr)}"]
     else:
         return [f"# unknown statement {stmt}"]
 

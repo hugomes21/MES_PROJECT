@@ -4,7 +4,17 @@ from Lang import *
 grammar = r"""
     start: stmt+
 
-    stmt: IDENTIFIER "=" expr "\n"
+    stmt: assign_stmt | if_stmt | for_stmt | while_stmt | funcdef_stmt
+
+    assign_stmt: IDENTIFIER "=" expr "\n"
+
+    if_stmt: "if" expr ":" "\n" stmt+ "else" ":" "\n" stmt+
+
+    for_stmt: "for" IDENTIFIER "in" "range" "(" expr "," expr ")" ":" "\n" stmt+
+
+    while_stmt: "while" expr ":" "\n" stmt+
+
+    funcdef_stmt: "def" IDENTIFIER "(" [IDENTIFIER ("," IDENTIFIER)*] ")" ":" "\n" stmt+
 
     ?expr: expr "==" expr   -> eq
          | expr "!=" expr   -> neq
@@ -14,6 +24,10 @@ grammar = r"""
          | expr "-" expr    -> sub
          | expr "*" expr    -> mul
          | expr "/" expr    -> div
+         | expr "&&" expr  -> and_
+         | expr "||" expr  -> or_
+         | "(" "not" expr ")"   -> not_
+         | IDENTIFIER "(" [expr ("," expr)*] ")" -> funccall
          | NUMBER           -> number
          | BOOLEAN          -> boolean
          | IDENTIFIER       -> var
@@ -61,15 +75,62 @@ class ASTTransformer(Transformer):
 
     def gt(self, args):
         return BinOp(">", args[0], args[1])
+    
+    def and_(self, args):
+        return BinOp("&&", args[0], args[1])
+    
+    def or_(self, args):
+        return BinOp("||", args[0], args[1])
+    
+    def not_(self, args):
+        return UnaryOp("not", args[0])
 
-    def stmt(self, args): # args[0] é o nome da variável e args[1] é a expressão
-        if len(args) != 2:
-            raise ValueError("Invalid assignment statement")
-        if not isinstance(args[0], str):
-            raise ValueError("Invalid variable name")
-        if not isinstance(args[1], Expr):
-            raise ValueError("Invalid expression")
+    def stmt(self, args):
+        return args[0]    
+    
+    def assign_stmt(self, args):
         return Assign(args[0], args[1])
+    
+    def if_stmt(self, args):
+        cond = args[0]
+        then_branch = args[1:1+len(args[1:])//2]
+        else_branch = args[1+len(args[1:])//2:]
+        return If(cond, then_branch, else_branch)
+    
+    def for_stmt(self, args):
+        var = args[0]   # variável for
+        start = args[1] # valor inicial
+        end = args[2]   # valor final
+        body = args[3:] # corpo do loop
+        return For(var, start, end, body)
+    
+    def while_stmt(self, args):
+        cond = args[0]
+        body = args[1:]
+        return While(cond, body)
+    
+    def funccall(self, args):
+        name = args[0]
+        params = args[1:]
+        return FunctionCall(name, params)
+
+    def funcdef_stmt(self, args):
+        name = args[0]
+        params = []
+        body_start = 1
+        if isinstance(args[1], list):
+            params = [str(p) for p in args[1]]
+            body_start = 2
+        elif isinstance(args[1], str):
+            params = [args[1]]
+            body_start = 2
+        elif isinstance(args[1], Stmt):
+            params = []
+            body_start = 1
+        else:
+            params = []
+        body = args[body_start:]
+        return FunctionDef(name, params, body)
 
     def start(self, stmts): # stmts é uma lista de declarações
         if not isinstance(stmts, list):

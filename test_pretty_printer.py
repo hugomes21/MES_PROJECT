@@ -1,4 +1,4 @@
-from Lang import programa1, programa2, programa3
+from Lang import programa1, programa2, programa3, programa4, programa5, programa6, programa7
 from parser import parse_code
 
 def prop_roundtrip(ast):
@@ -8,7 +8,8 @@ def prop_roundtrip(ast):
     return ast == ast2
 
 def main():
-    exemplos = [("programa1", programa1), ("programa2", programa2), ("programa3", programa3)]
+    exemplos = [("programa1", programa1), ("programa2", programa2), ("programa3", programa3), ("programa4", programa4),
+               ("programa5", programa5), ("programa6", programa6), ("programa7", programa7)]
     for nome, prog in exemplos:
         print(f"Exemplo: {nome}")
         print("Código pretty-printed:")
