@@ -45,7 +45,5 @@ def main():
                 print("✅ Roundtrip OK" if resultado else "❌ Roundtrip FALHOU")
                 print("-" * 50)
 
-
-
 if __name__ == "__main__":
     main()

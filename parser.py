@@ -1,7 +1,15 @@
 from lark import Lark, Transformer, Token
+from lark.indenter import Indenter
 from Lang import *
 
 grammar = r"""
+%import common.CNAME -> NAME
+%import common.WS_INLINE
+%import common.SH_COMMENT
+%ignore WS_INLINE
+%ignore SH_COMMENT
+%declare _INDENT _DEDENT
+
 start: stmt*
 
 stmt: assign_stmt
@@ -11,16 +19,16 @@ stmt: assign_stmt
     | funcdef_stmt
     | return_stmt
 
-assign_stmt: IDENTIFIER "=" expr NEWLINE
-return_stmt: "return" expr NEWLINE
+assign_stmt: IDENTIFIER "=" expr _NL
+return_stmt: "return" expr _NL
 
-funcdef_stmt: "def" IDENTIFIER "(" parameters? ")" ":" NEWLINE stmt+
+funcdef_stmt: "def" IDENTIFIER "(" parameters? ")" ":" _NL _INDENT stmt+ _DEDENT
 
-if_stmt: "if" expr ":" NEWLINE stmt+ "else" ":" NEWLINE stmt+
+if_stmt: "if" expr ":" _NL _INDENT stmt+ _DEDENT "else" ":" _NL _INDENT stmt+ _DEDENT
 
-for_stmt: "for" IDENTIFIER "in" "range" "(" expr "," expr ")" ":" NEWLINE stmt+
+for_stmt: "for" IDENTIFIER "in" "range" "(" expr "," expr ")" ":" _NL _INDENT stmt+ _DEDENT
 
-while_stmt: "while" expr ":" NEWLINE stmt+
+while_stmt: "while" expr ":" _NL _INDENT stmt+ _DEDENT
 
 parameters: IDENTIFIER ("," IDENTIFIER)*
 
@@ -37,18 +45,23 @@ parameters: IDENTIFIER ("," IDENTIFIER)*
         | "(" "not" expr ")"   -> not_
         | IDENTIFIER "(" [expr ("," expr)*] ")" -> funccall
         | NUMBER           -> number
-        | BOOLEAN          -> boolean
         | IDENTIFIER       -> var
+        | BOOLEAN          -> boolean
         | "(" expr ")"
 
-BOOLEAN: "true" | "false"
+_NL: (/\r?\n[\t ]*/ | SH_COMMENT)+
+BOOLEAN.10: "true" | "false"
 IDENTIFIER: /[a-zA-Z_]\w*/
 NUMBER: /-?\d+/
-
-%import common.NEWLINE
-%import common.WS_INLINE
-%ignore WS_INLINE
 """
+
+class TreeIndenter(Indenter):
+    NL_type = '_NL'
+    OPEN_PAREN_types = []
+    CLOSE_PAREN_types = []
+    INDENT_type = '_INDENT'
+    DEDENT_type = '_DEDENT'
+    tab_len = 8
 
 class ASTTransformer(Transformer):
     def start(self, stmts):
@@ -108,47 +121,50 @@ class ASTTransformer(Transformer):
     def parameters(self, args):
         return [str(p) for p in args]
 
-    
+    def _filter_newlines(self, stmts):
+        # Remove tokens _NL das listas de statements
+        return [s for s in stmts if not (isinstance(s, Token) and s.type == "_NL")]
+
+
     def if_stmt(self, args):
         cond = args[0]
-        then_branch = args[1:1+len(args[1:])//2]
-        else_branch = args[1+len(args[1:])//2:]
+        stmts = self._filter_newlines(args[1:])
+        half = len(stmts) // 2
+        then_branch = stmts[:half]
+        else_branch = stmts[half:]
         return If(cond, then_branch, else_branch)
     
     def for_stmt(self, args):
-        var = args[0]   # variável for
-        start = args[1] # valor inicial
-        end = args[2]   # valor final
-        body = args[3:] # corpo do loop
+        var = str(args[0])
+        start = args[1]
+        end = args[2]
+        body = self._filter_newlines(args[3:])
         return For(var, start, end, body)
     
     def while_stmt(self, args):
         cond = args[0]
-        body = args[1:]
+        body = self._filter_newlines(args[1:])
         return While(cond, body)
     
     def funccall(self, args):
-        name = args[0]
+        name = str(args[0])
         params = args[1:]
         return FunctionCall(name, params)
 
     def funcdef_stmt(self, args):
-        name = args[0]
+        name = str(args[0])
         if isinstance(args[1], list):
             params = [str(p) for p in args[1]]
-            body = args[2:]
+            body = self._filter_newlines(args[2:])
         elif isinstance(args[1], Token):
             params = [str(args[1])]
-            body = args[2:]
+            body = self._filter_newlines(args[2:])
         else:
             params = []
-            body = args[1:]
+            body = self._filter_newlines(args[1:])
         return FunctionDef(name, params, body)
 
-parser = Lark(grammar, parser='lalr', transformer=ASTTransformer())
+parser = Lark(grammar, parser='lalr', transformer=ASTTransformer(), postlex=TreeIndenter())
 
 def parse_code(code: str) -> Program:
-    # NÃO remova a indentação!
-    clean_code = code.strip() + "\n"
-    return parser.parse(clean_code)
-
+    return parser.parse(code.strip() + "\n")
