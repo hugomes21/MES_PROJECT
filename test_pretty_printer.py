@@ -1,4 +1,4 @@
-from Lang import programa1, programa2, programa3, programa4, programa5, programa6, programa7
+from Lang import *
 from parser import *
 from pretty_printing import *
 import difflib
@@ -30,10 +30,7 @@ def prop_roundtrip(ast):
 
 
 def main():
-    exemplos = [
-        ("programa1", programa1), ("programa2", programa2), ("programa3", programa3),
-        ("programa4", programa4), ("programa5", programa5), ("programa6", programa6), ("programa7", programa7)
-    ]
+    exemplos = [(nome, obj) for nome, obj in globals().items() if nome.startswith("programa")]
 
     with open("resultado_roundtrip.txt", "w", encoding="utf-8") as f:
         with redirect_stdout(f):

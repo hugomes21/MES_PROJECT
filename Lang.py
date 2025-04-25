@@ -85,7 +85,8 @@ class Program:
 # EXEMPLOS DE USO
 programa1 = Program([
     Assign("x", IntLit(10)), # x = 10
-    Assign("y", BinOp("+", Var("x"), IntLit(5))) # y = x + 5
+    Assign("y", BinOp("+", Var("x"), IntLit(5))), # y = x + 5
+    Return(Var("y"))
 ])
 
 programa2 = Program([
@@ -95,7 +96,8 @@ programa2 = Program([
         condition=BinOp(">", Var("a"), Var("b")), # if a > b
         then_branch=[Assign("max", Var("a"))], # max = a
         else_branch=[Assign("max", Var("b"))] # else max = b
-    )
+    ),
+    Return(Var("max"))
 ])
 
 programa3 = Program([
@@ -107,7 +109,8 @@ programa3 = Program([
         body=[
             Assign("sum", BinOp("+", Var("sum"), Var("i"))) # sum += i
         ]
-    )
+    ),
+    Return(Var("sum"))
 ])
 
 programa4 = Program([
@@ -151,6 +154,87 @@ programa7 = Program([
     )
 ])
 
+programa8 = Program([
+    Assign("a", BinOp("+", IntLit(0), IntLit(3))),      # → 3
+    Assign("b", BinOp("*", IntLit(1), IntLit(5))),      # → 5
+    Assign("c", BinOp("==", BoolLit(True), BoolLit(True))),  # → True
+    Assign("d", BinOp("||", BoolLit(False), BoolLit(True))), # → True
+    Assign("e", BinOp("+", Var("a"), IntLit(0))),       # → a
+    Assign("f", BinOp("*", Var("b"), IntLit(1)))        # → b
+])
+
+programa9 = Program([
+    If(
+        condition=BoolLit(True),
+        then_branch=[Assign("x", IntLit(1))],
+        else_branch=[Assign("x", IntLit(2))]  # → elimina o if
+    ),
+    If(
+        condition=BinOp("==", Var("x"), BoolLit(True)),  # → x
+        then_branch=[Assign("y", IntLit(1))],
+        else_branch=[Assign("y", IntLit(0))]
+    ),
+    If(
+        condition=Var("cond"),
+        then_branch=[Assign("z", IntLit(5))],
+        else_branch=[Assign("z", IntLit(5))]  # → code smell
+    )
+])
+
+programa10 = Program([
+    Assign("a", BinOp("+", IntLit(2), IntLit(3))),          # → 5
+    Assign("b", BinOp("*", BinOp("+", IntLit(0), IntLit(4)), IntLit(1))),  # → 4
+    Assign("c", BinOp("*", BinOp("*", IntLit(1), Var("b")), IntLit(0))),   # → 0
+    Assign("d", BinOp("==", BinOp("!=", BoolLit(True), BoolLit(True)), BoolLit(False)))  # → True
+])
+
+programa11 = Program([
+    Assign("x", IntLit(1)),
+    For(
+        var="i",
+        start=IntLit(0),
+        end=IntLit(0),  # loop nunca corre
+        body=[Assign("x", BinOp("+", Var("x"), IntLit(1)))]
+    ),
+    If(
+        condition=BoolLit(False),
+        then_branch=[Assign("y", IntLit(10))],
+        else_branch=[Assign("y", IntLit(20))]  # → y = 20
+    )
+])
+
+programa12 = Program([
+    Assign("flag", BinOp("==", BoolLit(True), BoolLit(False))),  # → False
+    Assign("check", BinOp("&&", BoolLit(True), BoolLit(False))), # → False
+    Assign("value", BinOp("+", BinOp("*", IntLit(0), IntLit(7)), IntLit(10)))  # → 10
+])
+
+programa13 = Program([
+    If(
+        condition=Var("x"),
+        then_branch=[Assign("z", IntLit(5))],
+        else_branch=[Assign("z", IntLit(5))]  # → code smell: branches iguais
+    ),
+    If(
+        condition=BoolLit(True),
+        then_branch=[Assign("a", BinOp("+", IntLit(1), IntLit(1)))],  # → a = 2
+        else_branch=[Assign("a", IntLit(999))]  # nunca executado
+    )
+])
+
+programa14 = Program([
+    FunctionDef(
+        name="mult_by_1",
+        params=["n"],
+        body=[
+            Assign("result", BinOp("*", Var("n"), IntLit(1))),  # → n
+            Return(Var("result"))
+        ]
+    ),
+    Assign("out", FunctionCall("mult_by_1", [IntLit(42)]))
+])
+
+
 if __name__ == "__main__":
     print("Programa 1:", programa1)
     print("Programa 2:", programa2)
@@ -159,3 +243,11 @@ if __name__ == "__main__":
     print("Programa 5:", programa5)
     print("Programa 6:", programa6)
     print("Programa 7:", programa7)
+    print("Programa 8:", programa8)
+    print("Programa 9:", programa9)
+    print("Programa 10:", programa10)
+    print("Programa 11:", programa11)
+    print("Programa 12:", programa12)
+    print("Programa 13:", programa13)
+    print("Programa 14:", programa14)
+    
