@@ -1,4 +1,6 @@
 from Lang import *
+from collections import Counter
+
 
 # 1.4 Optimization and Refactoring
 
@@ -9,32 +11,48 @@ def simplify_expr(expr: Expr) -> Expr:
 
         # Soma com 0
         if expr.op == "+":
-            if isinstance(left, IntLit) and left.value == 0:
-                return right
-            if isinstance(right, IntLit) and right.value == 0:
-                return left
+            if isinstance(left, IntLit) and left.value == 0: return right
+            if isinstance(right, IntLit) and right.value == 0: return left
+
+        # Subtração de 0
+        if expr.op == "-":
+            if isinstance(left, IntLit) and left.value == 0: return UnaryOp("-", right)
+            if isinstance(right, IntLit) and right.value == 0: return left
+        
         # Multiplicação por 1 ou 0
         if expr.op == "*":
             if isinstance(left, IntLit):
-                if left.value == 1:
-                    return right
-                if left.value == 0:
-                    return IntLit(0)
+                if left.value == 1: return right
+                if left.value == 0: return IntLit(0)
             if isinstance(right, IntLit):
-                if right.value == 1:
-                    return left
-                if right.value == 0:
-                    return IntLit(0)
+                if right.value == 1: return left
+                if right.value == 0: return IntLit(0)
+
+        # Divisão por 1
+        if expr.op == "/":
+            if isinstance(right, IntLit) and right.value == 1: return left
+            if isinstance(left, IntLit) and left.value == 0: return IntLit(0)
+        
+        # Divisão por 0
+        if expr.op == "/":
+            if isinstance(right, IntLit) and right.value == 0:
+                raise ZeroDivisionError("Divisão por zero")
+            if isinstance(left, IntLit) and left.value == 0: return IntLit(0)
+
         # Constante folding
         if isinstance(left, IntLit) and isinstance(right, IntLit):
-            if expr.op == "+":
-                return IntLit(left.value + right.value)
-            elif expr.op == "-":
-                return IntLit(left.value - right.value)
-            elif expr.op == "*":
-                return IntLit(left.value * right.value)
-            elif expr.op == "/":
-                return IntLit(left.value // right.value) if right.value != 0 else expr
+            if expr.op == "+": return IntLit(left.value + right.value)
+            elif expr.op == "-": return IntLit(left.value - right.value)
+            elif expr.op == "*": return IntLit(left.value * right.value)
+            elif expr.op == "/": return IntLit(left.value // right.value) if right.value != 0 else expr
+
+        # Simplificação de expressões booleanas
+        if expr.op == "&&":
+            if isinstance(left, BoolLit): return right if left.value else BoolLit(False)
+            if isinstance(right, BoolLit): return left if right.value else BoolLit(False)
+        if expr.op == "||":
+            if isinstance(left, BoolLit): return BoolLit(True) if left.value else right
+            if isinstance(right, BoolLit): return BoolLit(True) if right.value else left
 
         return BinOp(expr.op, left, right)
 
@@ -183,8 +201,6 @@ def names(prog: Program) -> list[str]:
         visit_stmt(stmt)
 
     return list(sorted(result))
-
-from collections import Counter
 
 def instructions(prog: Program) -> dict[str, int]:
     counter = Counter()
