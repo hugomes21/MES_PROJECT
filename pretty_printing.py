@@ -57,6 +57,9 @@ def pretty_stmt(stmt: Stmt, level=0) -> List[str]:
         body = sum([pretty_stmt(s, level + 1) for s in stmt.body], [])
         return [header] + indent(body, level + 1)
     
+    elif isinstance(stmt, Print):
+        return [f"print({pretty_expr(stmt.expr)})"]
+    
     elif isinstance(stmt, Return):
         return [f"return {pretty_expr(stmt.expr)}"]
     

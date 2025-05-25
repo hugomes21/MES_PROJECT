@@ -1,8 +1,7 @@
 from typing import List, Tuple, Dict, Union
 from Lang import *
-import random
+import random, sys
 from io import StringIO
-import sys
 
 # 1.5 Software Testing
 
@@ -16,7 +15,8 @@ class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
 
-def eval_expr(expr: Expr, env: Dict[str, Union[int, bool]]) -> Union[int, bool]:
+# 1. Evaluation
+def eval_expr(expr: Expr, env: Dict[str, Union[int, bool]], func_env: dict) -> Union[int, bool]:
     if isinstance(expr, IntLit):
         return expr.value
     elif isinstance(expr, BoolLit):
@@ -24,8 +24,8 @@ def eval_expr(expr: Expr, env: Dict[str, Union[int, bool]]) -> Union[int, bool]:
     elif isinstance(expr, Var):
         return env[expr.name]
     elif isinstance(expr, BinOp):
-        l = eval_expr(expr.left, env)
-        r = eval_expr(expr.right, env)
+        l = eval_expr(expr.left, env, func_env)
+        r = eval_expr(expr.right, env, func_env)
         if expr.op == "+": return l + r
         if expr.op == "-": return l - r
         if expr.op == "*": return l * r
@@ -37,46 +37,73 @@ def eval_expr(expr: Expr, env: Dict[str, Union[int, bool]]) -> Union[int, bool]:
         if expr.op == "&&": return l and r
         if expr.op == "||": return l or r
     elif isinstance(expr, UnaryOp):
-        v = eval_expr(expr.expr, env)
+        v = eval_expr(expr.expr, env, func_env)
         if expr.op == "not": return not v
         if expr.op == "-": return -v
     elif isinstance(expr, FunctionCall):
-        raise NotImplementedError("Function calls not yet supported")
-    else:
-        raise Exception(f"Unsupported expression: {expr}")
+        func_def = func_env.get(expr.name)
+        if not func_def:
+            raise Exception(f"Função '{expr.name}' não definida")
 
-def eval_stmt(stmt: Stmt, env: Dict[str, Union[int, bool]]):
+        if len(func_def.params) != len(expr.args):
+            raise Exception(f"Número de argumentos incorreto em '{expr.name}'")
+
+        new_env = {}  # Ambiente local para a função
+
+        for param, arg_expr in zip(func_def.params, expr.args):
+            new_env[param] = eval_expr(arg_expr, env, func_env)
+
+        try:
+            for stmt in func_def.body:
+                eval_stmt(stmt, new_env, func_env)
+        except ReturnException as ret:
+            return ret.value
+
+        raise Exception(f"Função '{expr.name}' não retornou valor")
+
+
+def eval_stmt(stmt: Stmt, env: Dict[str, Union[int, bool]], func_env: dict):
     if isinstance(stmt, Assign):
-        env[stmt.var] = eval_expr(stmt.expr, env)
+        env[stmt.var] = eval_expr(stmt.expr, env, func_env)
+    
     elif isinstance(stmt, If):
-        cond = eval_expr(stmt.condition, env)
+        cond = eval_expr(stmt.condition, env, func_env)
         branch = stmt.then_branch if cond else stmt.else_branch
         for s in branch:
-            eval_stmt(s, env)
+            eval_stmt(s, env, func_env)
+    
     elif isinstance(stmt, While):
-        while eval_expr(stmt.condition, env):
+        while eval_expr(stmt.condition, env, func_env):
             for s in stmt.body:
-                eval_stmt(s, env)
+                eval_stmt(s, env, func_env)
+    
     elif isinstance(stmt, For):
-        start = eval_expr(stmt.start, env)
-        end = eval_expr(stmt.end, env)
+        start = eval_expr(stmt.start, env, func_env)
+        end = eval_expr(stmt.end, env, func_env)
         for i in range(start, end):
             env[stmt.var] = i
             for s in stmt.body:
-                eval_stmt(s, env)
+                eval_stmt(s, env, func_env)
+   
+    elif isinstance(stmt, FunctionDef):
+        func_env[stmt.name] = stmt
+
     elif isinstance(stmt, Return):
-        raise ReturnException(eval_expr(stmt.expr, env))
-    
+        raise ReturnException(eval_expr(stmt.expr, env, func_env))
+
     elif isinstance(stmt, Print):
-        print(eval_expr(stmt.expr, env))
+        print(eval_expr(stmt.expr, env, func_env))
+
     elif isinstance(stmt, FunctionDef):
         raise NotImplementedError("Function definitions not yet supported")
 
 def evaluate(ast: Program, inputs: Inputs) -> int:
     env = {var: val for var, val in inputs}
+    func_env = {} # Novo ambiente para funções
+    
     try:
         for stmt in ast.body:
-            eval_stmt(stmt, env)
+            eval_stmt(stmt, env, func_env)
     except ReturnException as ret:
         return ret.value
 
@@ -85,6 +112,7 @@ def evaluate(ast: Program, inputs: Inputs) -> int:
     else:
         raise Exception("No return or 'result' variable found.")
 
+# 2. Test 
 def runTest(ast: Program, testCase: Tuple[Inputs, int]) -> bool:
     inputs, expected = testCase
     try:
@@ -93,21 +121,100 @@ def runTest(ast: Program, testCase: Tuple[Inputs, int]) -> bool:
     except:
         return False
 
+# 3. Test Suite
 def runTestSuite(ast: Program, testCases: List[Tuple[Inputs, int]]) -> bool:
     return all(runTest(ast, case) for case in testCases)
 
-def mutate(program: Program) -> Program:
-    mutated_body = []
-    for stmt in program.body:
-        if isinstance(stmt, Assign) and isinstance(stmt.expr, BinOp):
-            # Mudar operador '+' para '-' com 50% de probabilidade
-            if stmt.expr.op == "+" and random.random() < 0.5:
-                mutated_expr = BinOp("-", stmt.expr.left, stmt.expr.right)
-                mutated_body.append(Assign(stmt.var, mutated_expr))
-                continue
-        mutated_body.append(stmt)
-    return Program(mutated_body)
+# 5. Mutation Testing
+def mutate_expr(expr: Expr) -> Expr:
+    if isinstance(expr, BinOp):
+        mutations = []
+        if expr.op == "+":
+            mutations.append(lambda: BinOp("-", expr.left, expr.right))
+        if expr.op == "*":
+            mutations.append(lambda: BinOp("/", expr.left, expr.right))
+        if expr.op == "&&":
+            mutations.append(lambda: BinOp("||", expr.left, expr.right))
+        if expr.op == "||":
+            mutations.append(lambda: BinOp("&&", expr.left, expr.right))
+        if expr.op == "==":
+            mutations.append(lambda: BinOp("!=", expr.left, expr.right))
+        if expr.op == ">":
+            mutations.append(lambda: BinOp("<=", expr.left, expr.right))
+        if expr.op == "<":
+            mutations.append(lambda: BinOp(">=", expr.left, expr.right))
 
+
+        # Constante folding inverso (ex: 0 + x → x - 1)
+        if isinstance(expr.left, IntLit):
+            mutations.append(lambda: BinOp(expr.op, IntLit(expr.left.value + 1), expr.right))
+        if isinstance(expr.right, IntLit):
+            mutations.append(lambda: BinOp(expr.op, expr.left, IntLit(expr.right.value + 1)))
+
+        if mutations:
+            return random.choice(mutations)()
+
+        # Recurse nas subexpressões
+        return BinOp(expr.op, mutate_expr(expr.left), mutate_expr(expr.right))
+
+    elif isinstance(expr, UnaryOp):
+        return UnaryOp(expr.op, mutate_expr(expr.expr))
+
+    elif isinstance(expr, FunctionCall):
+        return FunctionCall(expr.name, [mutate_expr(arg) for arg in expr.args])
+
+    else:
+        return expr
+
+
+def mutate_stmt(stmt: Stmt) -> Stmt:
+    if isinstance(stmt, Assign):
+        return Assign(stmt.var, mutate_expr(stmt.expr))
+    elif isinstance(stmt, If):
+        return If(
+            mutate_expr(stmt.condition),
+            [mutate_stmt(s) for s in stmt.then_branch],
+            [mutate_stmt(s) for s in stmt.else_branch]
+        )
+    elif isinstance(stmt, While):
+        return While(
+            mutate_expr(stmt.condition),
+            [mutate_stmt(s) for s in stmt.body]
+        )
+    elif isinstance(stmt, For):
+        return For(
+            stmt.var,
+            mutate_expr(stmt.start),
+            mutate_expr(stmt.end),
+            [mutate_stmt(s) for s in stmt.body]
+        )
+    elif isinstance(stmt, FunctionDef):
+        return FunctionDef(
+            stmt.name,
+            stmt.params,
+            [mutate_stmt(s) for s in stmt.body]
+        )
+    elif isinstance(stmt, Return):
+        return Return(mutate_expr(stmt.expr))
+    elif isinstance(stmt, Print):
+        return Print(mutate_expr(stmt.expr))
+    else:
+        return stmt
+
+
+def mutate(program: Program) -> Program:
+    # Aplica mutação a apenas uma instrução aleatória
+    body = program.body[:]
+    if not body:
+        return program
+
+    idx = random.randrange(len(body))
+    body[idx] = mutate_stmt(body[idx])
+    return Program(body)
+
+
+
+# 8. Instrumentation
 def instrumentation(ast: Program) -> Program:
     def instrument_stmt(stmt: Stmt, count: int) -> Tuple[List[Stmt], int]:
         marker = Print(IntLit(count))

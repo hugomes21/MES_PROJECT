@@ -3,35 +3,68 @@ from evaluate import *
 from contextlib import redirect_stdout
 
 # Test suites para programa1 a programa3 (como exigido pelo enunciado para runTestSuite)
-testSuite1 = [ ([("x", 10)], 15) ]  # y = x + 5 → 15
-testSuite2 = [ ([], 4) ]           # max = b → 4
-testSuite3 = [ ([], 10) ]          # sum = 1+2+3+4 → 10
+testSuite1 = [ ([], 1) ]
+testSuite2 = [ ([], 6) ]
+testSuite3 = [ ([], 5) ]
+testPrintSuite = [ ([], 42) ]
 
 # Programas mutados
 programa1_mut = Program([
-    Assign("x", IntLit(10)),
-    Assign("y", BinOp("-", Var("x"), IntLit(5)))
-])
-programa2_mut = Program([
-    Assign("a", IntLit(3)),
-    Assign("b", IntLit(4)),
+    Assign("x", IntLit(3)),
+    Assign("y", IntLit(0)),
+    While(
+        condition=BinOp(">", Var("x"), IntLit(0)),
+        body=[
+            Assign("y", BinOp("+", Var("y"), Var("x"))),
+            Assign("x", BinOp("-", Var("x"), IntLit(1))),
+            Print(Var("y"))
+        ]
+    ),
     If(
-        condition=BinOp("<", Var("a"), Var("b")),
-        then_branch=[Assign("max", Var("a"))],
-        else_branch=[Assign("max", Var("b"))]
-    )
+        condition=BinOp("!=", Var("y"), IntLit(6)),  # <--- MUDADO
+        then_branch=[Assign("result", IntLit(1))],
+        else_branch=[Assign("result", IntLit(0))]
+    ),
+    Return(Var("result"))
 ])
-programa3_mut = Program([
+
+programa2_mut = Program([
     Assign("sum", IntLit(0)),
     For(
         var="i",
         start=IntLit(1),
-        end=IntLit(5),
+        end=IntLit(4),
         body=[
-            Assign("sum", BinOp("-", Var("sum"), Var("i")))
+            Assign("sum", BinOp("-", Var("sum"), Var("i"))),  # <--- MUDADO
+            Print(Var("sum"))
         ]
-    )
+    ),
+    If(
+        condition=BoolLit(True),
+        then_branch=[Assign("z", IntLit(5))],
+        else_branch=[Assign("z", IntLit(5))]
+    ),
+    Return(Var("sum"))
 ])
+
+programa3_mut = Program([
+    FunctionDef(
+        name="check_and_add",
+        params=["a", "b"],
+        body=[
+            If(
+                condition=BinOp("&&", BinOp(">", Var("a"), IntLit(0)), BinOp(">", Var("b"), IntLit(0))),
+                then_branch=[Assign("r", BinOp("*", Var("a"), Var("b")))],  # <--- MUDADO
+                else_branch=[Assign("r", IntLit(0))]
+            ),
+            Return(Var("r"))
+        ]
+    ),
+    Assign("x", FunctionCall("check_and_add", [IntLit(2), IntLit(3)])),
+    Print(Var("x")),
+    Return(Var("x"))
+])
+
 
 # Programa com instrução Print
 programa_com_print = Program([
@@ -40,18 +73,27 @@ programa_com_print = Program([
     Return(Var("x"))
 ])
 
-# Teste para programa com Print
-testPrintSuite = [ ([], 42) ]
-
 # Aplicar mutação aleatória ao programa1
-mutated_programa1 = mutate(programa1)
+def testar_mutacoes():
+    programas = [
+        ("programa1", programa1, testSuite1),
+        ("programa2", programa2, testSuite2),
+        ("programa3", programa3, testSuite3)
+    ]
+
+    for nome, prog, suite in programas:
+        mutado = mutate(prog)
+        print(f"\nMutando {nome}...")
+        print(mutado)
+        passou = runTestSuite(mutado, suite)
+        print(f"{nome} mutado → passou tests? {passou}")
+
 
 def test_all_with_evaluate():
-    print("=== Testar evaluate() para programa1 a programa14 ===")
+    print("======================== Testar evaluate() ========================")
     for i in range(1, 15):
         prog = globals().get(f"programa{i}")
-        if not prog:
-            continue
+        if not prog: continue
         try:
             result = evaluate(prog, [])
             print(f"Programa {i}: resultado = {result}")
@@ -59,7 +101,7 @@ def test_all_with_evaluate():
             print(f"Programa {i}: erro → {e}")
 
 def test_all_with_runTest():
-    print("\n=== Testar runTest() para programa1 a programa14 ===")
+    print("\n========================  Testar runTest() ========================")
     for i in range(1, 15):
         prog = globals().get(f"programa{i}")
         if not prog:
@@ -71,13 +113,11 @@ def test_all_with_runTest():
             print(f"Programa {i}: erro → {e}")
 
 def test_instrumentation_manual():
-    print("\n=== Testar instrumentation manualmente ===")
     instr = instrumentation(programa1)
     print("Programa 1 instrumentado:")
     print(instr)
 
 def test_instrumentedTestSuite_verbose():
-    print("\n=== Testar instrumentedTestSuite com trace ===")
     instrumented = instrumentation(programa1)
     for inputs, expected in testSuite1:
         output = StringIO()
@@ -107,26 +147,29 @@ def main():
             test_all_with_evaluate()
             test_all_with_runTest()
 
-            print("\n=== Testar runTestSuite() para os 3 programas escolhidos ===")
+            print("\n========================  Testar runTestSuite() para os 3 programas escolhidos ========================")
             print("Programa 1:", runTestSuite(programa1, testSuite1))
             print("Programa 2:", runTestSuite(programa2, testSuite2))
             print("Programa 3:", runTestSuite(programa3, testSuite3))
 
-            print("\n=== Testar runTestSuite() para os 3 programas mutados ===")
+            print("\n========================  Testar runTestSuite() para os 3 programas mutados ========================")
             print("Programa 1 Mutado:", runTestSuite(programa1_mut, testSuite1))
             print("Programa 2 Mutado:", runTestSuite(programa2_mut, testSuite2))
             print("Programa 3 Mutado:", runTestSuite(programa3_mut, testSuite3))
 
-            print("\n=== Testar programa com Print ===")
+            print("\n========================  Testar programa com Print ========================")
             print("Programa Print:", runTestSuite(programa_com_print, testPrintSuite))
 
-            print("\n=== Testar programa1 mutado aleatoriamente ===")
-            print("Programa 1 Mutado Aleatoriamente:", runTest(mutated_programa1, testSuite1[0]))
+            print("\n========================  Testar mutações aleatoriamente ========================")
+            testar_mutacoes()
 
+            print("\n========================  Testar instrumentation manualmente ========================")
             test_instrumentation_manual()
+
+            print("\n========================  Testar instrumentedTestSuite com trace ========================")
             test_instrumentedTestSuite_verbose()
 
-            print("\n=== Testar instrumentedTestSuite ===")
+            print("\n========================  Testar instrumentedTestSuite ========================")
             result = instrumentedTestSuite(programa1, testSuite1)
             print("instrumentedTestSuite para programa1:", result)
 

@@ -18,6 +18,7 @@ stmt: assign_stmt
     | while_stmt
     | funcdef_stmt
     | return_stmt
+    | print_stmt
 
 assign_stmt: IDENTIFIER "=" expr _NL
 return_stmt: "return" expr _NL
@@ -29,6 +30,8 @@ if_stmt: "if" expr ":" _NL _INDENT stmt+ _DEDENT "else" ":" _NL _INDENT stmt+ _D
 for_stmt: "for" IDENTIFIER "in" "range" "(" expr "," expr ")" ":" _NL _INDENT stmt+ _DEDENT
 
 while_stmt: "while" expr ":" _NL _INDENT stmt+ _DEDENT
+
+print_stmt: "print" "(" expr ")" _NL
 
 parameters: IDENTIFIER ("," IDENTIFIER)*
 
@@ -125,6 +128,9 @@ class ASTTransformer(Transformer):
         # Remove tokens _NL das listas de statements
         return [s for s in stmts if not (isinstance(s, Token) and s.type == "_NL")]
 
+    def print_stmt(self, args):
+        expr = args[0]
+        return Print(expr)
 
     def if_stmt(self, args):
         cond = args[0]
