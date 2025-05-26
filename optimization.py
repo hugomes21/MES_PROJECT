@@ -3,7 +3,7 @@ from collections import Counter
 
 
 # 1.4 Optimization and Refactoring
-
+# Otimizações 
 def simplify_expr(expr: Expr) -> Expr:
     if isinstance(expr, BinOp):
         left = simplify_expr(expr.left)
@@ -97,7 +97,7 @@ def simplify_stmt(stmt: Stmt) -> Stmt:
     else:
         return stmt
     
-
+# Refatorações
 def refactor_expr(expr: Expr) -> Expr:
     if isinstance(expr, BinOp):
         left = refactor_expr(expr.left)

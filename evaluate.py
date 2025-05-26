@@ -7,10 +7,6 @@ from io import StringIO
 
 Inputs = List[Tuple[str, int]]
 
-@dataclass
-class Print(Stmt):
-    expr: Expr
-
 class ReturnException(Exception):
     def __init__(self, value):
         self.value = value

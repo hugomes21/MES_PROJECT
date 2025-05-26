@@ -16,7 +16,7 @@ def prop_roundtrip(ast):
     try:
         ast2 = parse_code(code)
     except Exception as e:
-        print(f"❌ Erro ao fazer parse: {e}")
+        print(f"✗ Erro ao fazer parse: {e}")
         return False
     
     print("AST original:", repr(ast))
@@ -24,7 +24,7 @@ def prop_roundtrip(ast):
     if ast == ast2:
         return True
     else:
-        print("❌ ASTs diferentes!")
+        print("✗ ASTs diferentes!")
         print(show_diff(ast, ast2))
         return False
 
@@ -39,7 +39,7 @@ def main():
                 print("Código pretty-printed:")
                 print(str(prog))
                 resultado = prop_roundtrip(prog)
-                print("✅ Roundtrip OK" if resultado else "❌ Roundtrip FALHOU")
+                print("✓ Roundtrip OK" if resultado else "✗ Roundtrip FALHOU")
                 print("-" * 50)
 
 if __name__ == "__main__":

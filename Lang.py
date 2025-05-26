@@ -80,6 +80,7 @@ class Return(Stmt):
 class Print(Stmt):
     expr: Expr
 
+
 # RAIZ DO PROGRAMA
 @dataclass
 class Program:
@@ -94,7 +95,6 @@ programa1 = Program([
         body=[
             Assign("y", BinOp("+", Var("y"), Var("x"))),
             Assign("x", BinOp("-", Var("x"), IntLit(1))),
-            Print(Var("y"))
         ]
     ),
     If(
@@ -113,7 +113,6 @@ programa2 = Program([
         end=IntLit(4),
         body=[
             Assign("sum", BinOp("+", Var("sum"), Var("i"))),
-            Print(Var("sum"))
         ]
     ),
     If(
@@ -138,6 +137,5 @@ programa3 = Program([
         ]
     ),
     Assign("x", FunctionCall("check_and_add", [Var("a"), Var("b")])),
-    Print(Var("x")),
     Return(Var("x"))
 ])

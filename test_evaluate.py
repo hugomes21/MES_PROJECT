@@ -29,9 +29,6 @@ runTestSuitePrograma1 = runTestSuite(programa1, testSuite1)
 runTestSuitePrograma2 = runTestSuite(programa2, testSuite2)
 runTestSuitePrograma3 = runTestSuite(programa3, testSuite3)
 
-
-testPrintSuite = [ ([], 42) ]
-
 # Programas mutados
 programa1_mut = Program([
     Assign("y", IntLit(0)),
@@ -92,14 +89,6 @@ programa3_mut = Program([
 runTestSuitePrograma1Mut = runTestSuite(programa1_mut, testSuite1)
 runTestSuitePrograma2Mut = runTestSuite(programa2_mut, testSuite2)
 runTestSuitePrograma3Mut = runTestSuite(programa3_mut, testSuite3)
-
-
-# Programa com instrução Print
-programa_com_print = Program([
-    Assign("x", IntLit(42)),
-    Print(Var("x")),
-    Return(Var("x"))
-])
 
 # Aplicar mutação aleatória ao programa1
 def testar_mutacoes():
@@ -201,9 +190,6 @@ def main():
             print("Programa 1 Mutado:", runTestSuitePrograma1Mut)
             print("Programa 2 Mutado:", runTestSuitePrograma2Mut)
             print("Programa 3 Mutado:", runTestSuitePrograma3Mut)
-
-            print("\n========================  Testar programa com Print ========================")
-            print("Programa Print:", runTestSuite(programa_com_print, testPrintSuite))
 
             print("\n========================  Testar mutações aleatoriamente ========================")
             testar_mutacoes()
