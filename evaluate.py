@@ -92,7 +92,12 @@ def eval_stmt(stmt: Stmt, env: Dict[str, Union[int, bool]], func_env: dict):
         raise ReturnException(eval_expr(stmt.expr, env, func_env))
 
     elif isinstance(stmt, Print):
-        print(eval_expr(stmt.expr, env, func_env))
+        val = eval_expr(stmt.expr, env, func_env)
+        if isinstance(stmt.expr, IntLit):
+            print(f"Instr: {val}")
+        else:
+            print(val)
+
 
     elif isinstance(stmt, FunctionDef):
         raise NotImplementedError("Function definitions not yet supported")
@@ -166,7 +171,6 @@ def mutate_expr(expr: Expr) -> Expr:
     else:
         return expr
 
-
 def mutate_stmt(stmt: Stmt) -> Stmt:
     if isinstance(stmt, Assign):
         return Assign(stmt.var, mutate_expr(stmt.expr))
@@ -201,7 +205,6 @@ def mutate_stmt(stmt: Stmt) -> Stmt:
     else:
         return stmt
 
-
 def mutate(program: Program) -> Program:
     # Aplica mutação a apenas uma instrução aleatória
     body = program.body[:]
@@ -211,8 +214,6 @@ def mutate(program: Program) -> Program:
     idx = random.randrange(len(body))
     body[idx] = mutate_stmt(body[idx])
     return Program(body)
-
-
 
 # 8. Instrumentation
 def instrumentation(ast: Program) -> Program:
@@ -263,9 +264,68 @@ def instrumentedTestSuite(ast: Program, testCases: List[Tuple[Inputs, int]]) -> 
         trace = output.getvalue().strip().splitlines()
         print("Execução instrumentada:")
         for line in trace:
-            print("  Instr:", line)
+            print(line)
 
         if result != expected:
             all_passed = False
 
     return all_passed
+
+# Extra : Spectrum Based Fault Localization
+def collect_spectrum_data(program, test_suite):
+    results = []
+    instrumented_program = instrumentation(program)
+    for inputs, expected in test_suite:
+        output = StringIO()
+        sys_stdout_backup = sys.stdout
+        sys.stdout = output
+        try:
+            result = evaluate(instrumented_program, inputs)
+            passed = (result == expected)
+        except:
+            passed = False
+        finally:
+            sys.stdout = sys_stdout_backup
+
+        trace = output.getvalue().strip().splitlines()
+        instr_ids = []
+        for line in trace:
+            if line.startswith("Instr: "):
+                try:
+                    instr_id = int(line.replace("Instr: ", "").strip())
+                    instr_ids.append(instr_id)
+                except ValueError:
+                    pass
+        # ← colocar aqui, não dentro do loop anterior!
+        results.append((instr_ids, passed))
+    return results
+
+def compute_ochiai(spectrum_data):
+    from collections import defaultdict
+    total_fail = sum(1 for _, passed in spectrum_data if not passed)
+    instr_stats = defaultdict(lambda: {"pass": 0, "fail": 0})
+    
+    for instrs, passed in spectrum_data:
+        for instr_id in instrs:
+            if passed:
+                instr_stats[instr_id]["pass"] += 1
+            else:
+                instr_stats[instr_id]["fail"] += 1
+
+    scores = {}
+    for instr_id, counts in instr_stats.items():
+        f = counts["fail"]
+        p = counts["pass"]
+        if total_fail == 0 or (f + p) == 0:
+            score = 0.0
+        else:
+            denom = ((f + p) * total_fail) ** 0.5
+            score = f / denom
+        scores[instr_id] = score
+    return sorted(scores.items(), key=lambda x: -x[1])
+
+
+def spectrum_based_fault_localization(program, test_suite):
+    spectrum_data = collect_spectrum_data(program, test_suite)
+    ochiai_scores = compute_ochiai(spectrum_data)
+    return ochiai_scores

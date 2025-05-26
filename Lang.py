@@ -88,7 +88,6 @@ class Program:
 
 # EXEMPLOS DE USO
 programa1 = Program([
-    Assign("x", IntLit(3)),
     Assign("y", IntLit(0)),
     While(
         condition=BinOp(">", Var("x"), IntLit(0)),
@@ -138,7 +137,7 @@ programa3 = Program([
             Return(Var("r"))
         ]
     ),
-    Assign("x", FunctionCall("check_and_add", [IntLit(2), IntLit(3)])),
+    Assign("x", FunctionCall("check_and_add", [Var("a"), Var("b")])),
     Print(Var("x")),
     Return(Var("x"))
 ])

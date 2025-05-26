@@ -3,14 +3,31 @@ from evaluate import *
 from contextlib import redirect_stdout
 
 # Test suites para programa1 a programa3 (como exigido pelo enunciado para runTestSuite)
-testSuite1 = [ ([], 1) ]
-testSuite2 = [ ([], 6) ]
-testSuite3 = [ ([], 5) ]
+testSuite1 = [
+    ([("x", 3)], 1),             # x = 3 → soma = 6 → result = 1
+    ([("x", 2)], 0),             # soma = 2 + 1 = 3 → result = 0
+    ([("x", 0)], 0),             # while nunca executa
+    ([("x", 1)], 0),             # soma = 1 → result = 0
+    ([("x", 4)], 0)              # soma = 4+3+2+1 = 10 → result = 0
+]
+testSuite2 = [
+    ([], 6),                          # soma 1+2+3
+    ([("i", 0)], 6),                  # ignora "i" se não usada
+    ([("sum", 5)], 6),               # ignora "sum" externo
+]
+testSuite3 = [
+    ([("a", 2), ("b", 3)], 5),   # passa → soma
+    ([("a", 0), ("b", 1)], 0),   # falha → a ≤ 0
+    ([("a", 2), ("b", -1)], 0),  # falha → b ≤ 0
+    ([("a", 1), ("b", 1)], 2),   # passa
+    ([("a", 1), ("b", 0)], 0),   # falha
+    ([("a", -1), ("b", -1)], 0)  # falha total
+]
+
 testPrintSuite = [ ([], 42) ]
 
 # Programas mutados
 programa1_mut = Program([
-    Assign("x", IntLit(3)),
     Assign("y", IntLit(0)),
     While(
         condition=BinOp(">", Var("x"), IntLit(0)),
@@ -60,7 +77,7 @@ programa3_mut = Program([
             Return(Var("r"))
         ]
     ),
-    Assign("x", FunctionCall("check_and_add", [IntLit(2), IntLit(3)])),
+    Assign("x", FunctionCall("check_and_add", [Var("a"), Var("b")])),  # <--- MUDADO
     Print(Var("x")),
     Return(Var("x"))
 ])
@@ -91,54 +108,71 @@ def testar_mutacoes():
 
 def test_all_with_evaluate():
     print("======================== Testar evaluate() ========================")
-    for i in range(1, 15):
+    
+    test_suites = {
+        1: testSuite1,
+        2: testSuite2,
+        3: testSuite3
+    }
+
+    for i in range(1, 4):
         prog = globals().get(f"programa{i}")
-        if not prog: continue
-        try:
-            result = evaluate(prog, [])
-            print(f"Programa {i}: resultado = {result}")
-        except Exception as e:
-            print(f"Programa {i}: erro → {e}")
+        suite = test_suites.get(i)
+        if not prog or not suite:
+            continue
+
+        for j, (inputs, expected) in enumerate(suite, 1):
+            try:
+                result = evaluate(prog, inputs)
+                status = "✓" if result == expected else "✗"
+                print(f"Programa {i} - Teste {j}: resultado = {result} (esperado = {expected}) {status}")
+            except Exception as e:
+                print(f"Programa {i} - Teste {j}: erro → {e}")
+
 
 def test_all_with_runTest():
     print("\n========================  Testar runTest() ========================")
-    for i in range(1, 15):
+    
+    test_suites = {
+        1: testSuite1,
+        2: testSuite2,
+        3: testSuite3
+    }
+
+    for i in range(1, 4):
         prog = globals().get(f"programa{i}")
-        if not prog:
+        suite = test_suites.get(i)
+        if not prog or not suite:
             continue
-        try:
-            ok = runTest(prog, ([], evaluate(prog, [])))
-            print(f"Programa {i}: passou = {ok}")
-        except Exception as e:
-            print(f"Programa {i}: erro → {e}")
+
+        for j, test_case in enumerate(suite, 1):
+            try:
+                ok = runTest(prog, test_case)
+                status = "✓" if ok else "✗"
+                print(f"Programa {i} - Teste {j}: passou = {ok} {status}")
+            except Exception as e:
+                print(f"Programa {i} - Teste {j}: erro → {e}")
+
 
 def test_instrumentation_manual():
     instr = instrumentation(programa1)
     print("Programa 1 instrumentado:")
     print(instr)
 
-def test_instrumentedTestSuite_verbose():
-    instrumented = instrumentation(programa1)
-    for inputs, expected in testSuite1:
-        output = StringIO()
-        sys_stdout_backup = sys.stdout
-        sys.stdout = output
 
-        try:
-            result = evaluate(instrumented, inputs)
-        except:
-            result = None
-        finally:
-            sys.stdout = sys_stdout_backup
 
-        trace = output.getvalue().strip().splitlines()
-        print("Trace da execução:")
-        for line in trace:
-            print("  Instr:", line)
+def test_sbfl():
+    programas = [
+        ("programa1", programa1_mut, testSuite1),
+        ("programa2", programa2_mut, testSuite2),
+        ("programa3", programa3_mut, testSuite3)
+    ]
 
-        print("Resultado esperado:", expected)
-        print("Resultado obtido:", result)
-        print("Teste passou:", result == expected)
+    for nome, prog, suite in programas:
+        print(f"\n SBFL para {nome}_mut")
+        scores = spectrum_based_fault_localization(prog, suite)
+        for instr_id, score in scores:
+            print(f"Instrução {instr_id}: score = {score:.4f}")
 
 
 def main():
@@ -166,12 +200,17 @@ def main():
             print("\n========================  Testar instrumentation manualmente ========================")
             test_instrumentation_manual()
 
-            print("\n========================  Testar instrumentedTestSuite com trace ========================")
-            test_instrumentedTestSuite_verbose()
-
             print("\n========================  Testar instrumentedTestSuite ========================")
             result = instrumentedTestSuite(programa1, testSuite1)
             print("instrumentedTestSuite para programa1:", result)
+            result = instrumentedTestSuite(programa2, testSuite2)
+            print("instrumentedTestSuite para programa2:", result)
+            result = instrumentedTestSuite(programa3, testSuite3)
+            print("instrumentedTestSuite para programa3:", result)
+
+            print("\n========================  SBFL (Spectrum-Based Fault Localization) ========================")
+            test_sbfl()
+
 
 if __name__ == "__main__":
     main()
