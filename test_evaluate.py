@@ -24,6 +24,12 @@ testSuite3 = [
     ([("a", -1), ("b", -1)], 0)  # falha total
 ]
 
+# Programas de teste
+runTestSuitePrograma1 = runTestSuite(programa1, testSuite1)
+runTestSuitePrograma2 = runTestSuite(programa2, testSuite2)
+runTestSuitePrograma3 = runTestSuite(programa3, testSuite3)
+
+
 testPrintSuite = [ ([], 42) ]
 
 # Programas mutados
@@ -81,6 +87,11 @@ programa3_mut = Program([
     Print(Var("x")),
     Return(Var("x"))
 ])
+
+# Programas de teste mutados
+runTestSuitePrograma1Mut = runTestSuite(programa1_mut, testSuite1)
+runTestSuitePrograma2Mut = runTestSuite(programa2_mut, testSuite2)
+runTestSuitePrograma3Mut = runTestSuite(programa3_mut, testSuite3)
 
 
 # Programa com instrução Print
@@ -182,14 +193,14 @@ def main():
             test_all_with_runTest()
 
             print("\n========================  Testar runTestSuite() para os 3 programas escolhidos ========================")
-            print("Programa 1:", runTestSuite(programa1, testSuite1))
-            print("Programa 2:", runTestSuite(programa2, testSuite2))
-            print("Programa 3:", runTestSuite(programa3, testSuite3))
+            print("Programa 1:", runTestSuitePrograma1)
+            print("Programa 2:", runTestSuitePrograma2)
+            print("Programa 3:", runTestSuitePrograma3)
 
             print("\n========================  Testar runTestSuite() para os 3 programas mutados ========================")
-            print("Programa 1 Mutado:", runTestSuite(programa1_mut, testSuite1))
-            print("Programa 2 Mutado:", runTestSuite(programa2_mut, testSuite2))
-            print("Programa 3 Mutado:", runTestSuite(programa3_mut, testSuite3))
+            print("Programa 1 Mutado:", runTestSuitePrograma1Mut)
+            print("Programa 2 Mutado:", runTestSuitePrograma2Mut)
+            print("Programa 3 Mutado:", runTestSuitePrograma3Mut)
 
             print("\n========================  Testar programa com Print ========================")
             print("Programa Print:", runTestSuite(programa_com_print, testPrintSuite))
