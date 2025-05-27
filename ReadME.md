@@ -10,7 +10,7 @@ Este projeto consiste no desenvolvimento da linguagem Lang com suporte a parsing
 ## Instruções
 
 # Instalar dependências
-pip install -r requirements.txt
+lark=1.2.2
 
 # Gerar resultados
 python3 test_pretty_printer.py
