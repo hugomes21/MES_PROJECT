@@ -128,12 +128,15 @@ def runTestSuite(ast: Program, testCases: List[Tuple[Inputs, int]]) -> bool:
 
 # 5. Mutation Testing
 def mutate_expr(expr: Expr) -> Expr:
+    last_mutation_applied = None
     if isinstance(expr, BinOp):
         mutations = []
         if expr.op == "+":
             mutations.append(lambda: BinOp("-", expr.left, expr.right))
         if expr.op == "*":
-            mutations.append(lambda: BinOp("/", expr.left, expr.right))
+            # Evita mutar para divisão por zero
+            if not (isinstance(expr.right, IntLit) and expr.right.value == 0):
+                mutations.append(lambda: BinOp("/", expr.left, expr.right))
         if expr.op == "&&":
             mutations.append(lambda: BinOp("||", expr.left, expr.right))
         if expr.op == "||":
@@ -201,15 +204,121 @@ def mutate_stmt(stmt: Stmt) -> Stmt:
     else:
         return stmt
 
+def collect_used_vars(program: Program) -> set:
+    used = set()
+
+    def visit_expr(expr):
+        if isinstance(expr, Var):
+            used.add(expr.name)
+        elif isinstance(expr, BinOp):
+            visit_expr(expr.left)
+            visit_expr(expr.right)
+        elif isinstance(expr, UnaryOp):
+            visit_expr(expr.expr)
+        elif isinstance(expr, FunctionCall):
+            for arg in expr.args:
+                visit_expr(arg)
+
+    def visit_stmt(stmt):
+        if isinstance(stmt, Assign):
+            visit_expr(stmt.expr)
+        elif isinstance(stmt, If):
+            visit_expr(stmt.condition)
+            for s in stmt.then_branch + stmt.else_branch:
+                visit_stmt(s)
+        elif isinstance(stmt, While):
+            visit_expr(stmt.condition)
+            for s in stmt.body:
+                visit_stmt(s)
+        elif isinstance(stmt, For):
+            visit_expr(stmt.start)
+            visit_expr(stmt.end)
+            for s in stmt.body:
+                visit_stmt(s)
+        elif isinstance(stmt, FunctionDef):
+            for s in stmt.body:
+                visit_stmt(s)
+        elif isinstance(stmt, Return):
+            visit_expr(stmt.expr)
+        elif isinstance(stmt, Print):
+            visit_expr(stmt.expr)
+
+    for s in program.body:
+        visit_stmt(s)
+
+    return used
+
+
+def collect_mutable_stmts(program: Program) -> List[Stmt]:
+    used_vars = collect_used_vars(program)
+    stmts = []
+
+    def visit(stmt):
+        # só inclui Assign se a variável for usada depois
+        if isinstance(stmt, Assign) and stmt.var not in used_vars:
+            return
+        stmts.append(stmt)
+
+        # desce recursivamente
+        if isinstance(stmt, If):
+            for s in stmt.then_branch + stmt.else_branch:
+                visit(s)
+        elif isinstance(stmt, While):
+            for s in stmt.body:
+                visit(s)
+        elif isinstance(stmt, For):
+            for s in stmt.body:
+                visit(s)
+        elif isinstance(stmt, FunctionDef):
+            for s in stmt.body:
+                visit(s)
+
+    for s in program.body:
+        visit(s)
+
+    return stmts
+
+
 def mutate(program: Program) -> Program:
-    # Aplica mutação a apenas uma instrução aleatória
-    body = program.body[:]
-    if not body:
+    mutable_stmts = collect_mutable_stmts(program)
+    if not mutable_stmts:
         return program
 
-    idx = random.randrange(len(body))
-    body[idx] = mutate_stmt(body[idx])
-    return Program(body)
+    target = random.choice(mutable_stmts)
+    mutated = mutate_stmt(target)
+
+    def replace(stmt):
+        if stmt == target:
+            return mutated
+        elif isinstance(stmt, If):
+            return If(
+                stmt.condition,
+                [replace(s) for s in stmt.then_branch],
+                [replace(s) for s in stmt.else_branch]
+            )
+        elif isinstance(stmt, While):
+            return While(
+                stmt.condition,
+                [replace(s) for s in stmt.body]
+            )
+        elif isinstance(stmt, For):
+            return For(
+                stmt.var,
+                stmt.start,
+                stmt.end,
+                [replace(s) for s in stmt.body]
+            )
+        elif isinstance(stmt, FunctionDef):
+            return FunctionDef(
+                stmt.name,
+                stmt.params,
+                [replace(s) for s in stmt.body]
+            )
+        else:
+            return stmt
+
+    return Program([replace(s) for s in program.body])
+
 
 # 8. Instrumentation
 def instrumentation(ast: Program) -> Program:
@@ -292,7 +401,6 @@ def collect_spectrum_data(program, test_suite):
                     instr_ids.append(instr_id)
                 except ValueError:
                     pass
-        # ← colocar aqui, não dentro do loop anterior!
         results.append((instr_ids, passed))
     return results
 

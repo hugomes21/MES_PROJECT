@@ -90,38 +90,57 @@ class Program:
 # EXEMPLOS DE USO
 programa1 = Program([
     Assign("y", IntLit(0)),
+    Assign("temp", BinOp("+", IntLit(0), IntLit(3))),  # → 3
+    Assign("useless", BinOp("*", IntLit(1), IntLit(1))),  # → 1
     While(
-        condition=BinOp(">", Var("x"), IntLit(0)),
+        condition=BinOp("==", BinOp(">", Var("x"), IntLit(0)), BoolLit(True)),  # → apenas (x > 0)
         body=[
-            Assign("y", BinOp("+", Var("y"), Var("x"))),
-            Assign("x", BinOp("-", Var("x"), IntLit(1))),
+            Assign("y", BinOp("+", Var("y"), BinOp("*", Var("x"), IntLit(1)))),  # → y + x
+            Assign("x", BinOp("-", Var("x"), IntLit(0))),  # → x (não altera)
+            Assign("x", BinOp("-", Var("x"), IntLit(1)))
         ]
     ),
     If(
-        condition=BinOp("==", Var("y"), IntLit(6)),
-        then_branch=[Assign("result", IntLit(1))],
-        else_branch=[Assign("result", IntLit(0))]
+        condition=BoolLit(True),  # → if sempre executado
+        then_branch=[
+            If(
+                condition=BinOp("==", Var("y"), IntLit(6)),
+                then_branch=[Assign("result", IntLit(1))],
+                else_branch=[Assign("result", IntLit(0))]
+            )
+        ],
+        else_branch=[
+            Assign("result", IntLit(999))
+        ]
     ),
     Return(Var("result"))
 ])
 
+
 programa2 = Program([
     Assign("sum", IntLit(0)),
+    Assign("zero", BinOp("+", IntLit(0), IntLit(0))),  # → 0
     For(
         var="i",
         start=IntLit(1),
         end=IntLit(4),
         body=[
-            Assign("sum", BinOp("+", Var("sum"), Var("i"))),
+            Assign("sum", BinOp("+", Var("sum"), BinOp("*", IntLit(1), Var("i")))),  # → sum + i
+            Assign("dummy", BinOp("*", Var("i"), IntLit(0)))  # → 0
         ]
     ),
     If(
-        condition=BoolLit(True),
-        then_branch=[Assign("z", IntLit(5))],
-        else_branch=[Assign("z", IntLit(5))]  # code smell
+        condition=BinOp("==", BoolLit(True), BoolLit(True)),  # → True
+        then_branch=[
+            Assign("z", IntLit(5))
+        ],
+        else_branch=[
+            Assign("z", IntLit(5))  # branches iguais
+        ]
     ),
     Return(Var("sum"))
 ])
+
 
 programa3 = Program([
     FunctionDef(
@@ -129,13 +148,25 @@ programa3 = Program([
         params=["a", "b"],
         body=[
             If(
-                condition=BinOp("&&", BinOp(">", Var("a"), IntLit(0)), BinOp(">", Var("b"), IntLit(0))),
-                then_branch=[Assign("r", BinOp("+", Var("a"), Var("b")))],
-                else_branch=[Assign("r", IntLit(0))]
+                condition=BinOp("==", BinOp(">", Var("a"), IntLit(0)), BoolLit(True)),  # → apenas a > 0
+                then_branch=[
+                    If(
+                        condition=BinOp("==", BinOp(">", Var("b"), IntLit(0)), BoolLit(True)),  # → b > 0
+                        then_branch=[
+                            Assign("r", BinOp("+", Var("a"), BinOp("+", Var("b"), IntLit(0))))  # → a + b
+                        ],
+                        else_branch=[Assign("r", IntLit(0))]
+                    )
+                ],
+                else_branch=[
+                    Assign("r", IntLit(0))
+                ]
             ),
             Return(Var("r"))
         ]
     ),
+    Assign("temp", BinOp("*", IntLit(1), IntLit(1))),  # → 1
     Assign("x", FunctionCall("check_and_add", [Var("a"), Var("b")])),
+    Assign("x", BinOp("*", Var("x"), IntLit(1))),  # → x
     Return(Var("x"))
 ])

@@ -241,26 +241,39 @@ def detect_smells(prog: Program) -> dict[str, int]:
                 visit_expr(arg)
 
     def visit_stmt(stmt: Stmt):
+        # Atribuição redundante x = x
         if isinstance(stmt, Assign):
+            if isinstance(stmt.expr, Var) and stmt.var == stmt.expr.name:
+                smells["atribuição redundante (x = x)"] += 1
             visit_expr(stmt.expr)
+
         elif isinstance(stmt, If):
             if stmt.then_branch == stmt.else_branch:
                 smells["branches iguais em if"] += 1
             visit_expr(stmt.condition)
             for s in stmt.then_branch + stmt.else_branch:
                 visit_stmt(s)
+
         elif isinstance(stmt, While):
+            if isinstance(stmt.condition, BoolLit) and stmt.condition.value:
+                smells["while True pode causar loop infinito"] += 1
             visit_expr(stmt.condition)
             for s in stmt.body:
                 visit_stmt(s)
+
         elif isinstance(stmt, For):
             visit_expr(stmt.start)
             visit_expr(stmt.end)
             for s in stmt.body:
                 visit_stmt(s)
+
         elif isinstance(stmt, FunctionDef):
-            for s in stmt.body:
+            for i, s in enumerate(stmt.body):
                 visit_stmt(s)
+                # Código morto após return
+                if isinstance(s, Return) and i < len(stmt.body) - 1:
+                    smells["código morto após return"] += 1
+
         elif isinstance(stmt, Return):
             visit_expr(stmt.expr)
 
